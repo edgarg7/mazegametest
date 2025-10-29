@@ -9,7 +9,7 @@ const config = {
   scale: {
     mode: Phaser.Scale.RESIZE,      // ⬅ fill the window exactly
     autoCenter: Phaser.Scale.NO_CENTER
-    // width/height not needed in RESIZE mode
+    
   },
   physics: {
     default: 'arcade',

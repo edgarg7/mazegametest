@@ -1,7 +1,5 @@
 export default class VirtualJoystick {
-  /**
-   * Fixed bottom-left joystick. getVector() returns {x,y} in [-1..1] with a deadzone.
-   */
+ 
   constructor(scene) {
     this.scene = scene;
     this.active = false;
@@ -29,7 +27,7 @@ export default class VirtualJoystick {
     const onDown = (p) => {
       // Only start joystick when finger begins on or near the joystick base
       const d = Phaser.Math.Distance.Between(p.x, p.y, this.center.x, this.center.y);
-      const maxTouchDist = this.base.displayWidth; // tolerance
+      const maxTouchDist = this.base.displayWidth; 
       if (d > maxTouchDist) return;
 
       if (activeId !== null) return;

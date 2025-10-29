@@ -201,7 +201,7 @@ export default class GameScene extends Phaser.Scene {
     const z = Math.min(zx, zy);
     this.cameras.main.setZoom(Phaser.Math.Clamp(z, 0.1, 4));
 
-    // Keep HUD pinned (slightly lower on mobile)
+    // Keep HUD pinned 
     const hudY = this.isTouch ? 22 : 12;
     this.hudBg?.setPosition(8, hudY - 4);
     this.hud?.setPosition(16, hudY);
@@ -217,14 +217,12 @@ export default class GameScene extends Phaser.Scene {
       const vy = dir === 'up' ? -S : dir === 'down' ? S : 0;
       this.player.sprite.setVelocity(vx, vy);
     } else {
-      // Mobile: joystick vector → continuous velocity
+      // Mobile: joystick vector
       const v = this.inputMgr.getJoystickVector();
       const S = PLAYER_SPEED;
       this.player.sprite.setVelocity(v.x * S, v.y * S);
 
-      // To force strict 4-way movement instead of diagonals, replace above with:
-      // if (Math.abs(v.x) > Math.abs(v.y)) this.player.sprite.setVelocity(Math.sign(v.x)*S, 0);
-      // else this.player.sprite.setVelocity(0, Math.sign(v.y)*S);
+      
     }
 
     // Enemies
@@ -250,7 +248,7 @@ export default class GameScene extends Phaser.Scene {
 
   onHitByEnemy() {
     this.cameras.main.shake(120, 0.006);
-    this.scene.restart({ isTouch: this.isTouch }); // preserve touch mode
+    this.scene.restart({ isTouch: this.isTouch }); 
   }
 
   winLevel() {

@@ -54,13 +54,13 @@ function carveRecursiveBacktracker(grid, sx, sy) {
 
     const [dx, dy] = neighbors[0];
     const nx = cx + dx, ny = cy + dy;
-    grid[cy + dy/2][cx + dx/2] = 1; // open wall between
+    grid[cy + dy/2][cx + dx/2] = 1; 
     grid[ny][nx] = 1;
     markVisited(nx, ny);
     stack.push({ x: nx, y: ny });
   }
 
-  // Strip visited bit -> keep 0/1
+  
   for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) grid[y][x] = grid[y][x] ? 1 : 0;
 }
 

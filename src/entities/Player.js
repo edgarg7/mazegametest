@@ -4,20 +4,16 @@ export default class Player {
   constructor(scene, worldX, worldY) {
     this.scene = scene;
 
-    // Use the pre-sized texture generated in BootScene (no setDisplaySize needed)
     this.sprite = scene.physics.add.image(worldX, worldY, 'playerBox')
       .setOrigin(0.5)
       .setDepth(5)
       .setCollideWorldBounds(true);
 
-    // Rectangle body already matches the texture size exactly,
-    // which is smaller than the corridor. No offsets or scaling required.
-
     this.currentDirection = null;  // 'left'|'right'|'up'|'down'
     this.queuedDirection = null;
   }
 
-  /** Request a direction; apply immediately if legal (at center), else queue. */
+  
   requestDirection(dir, isOpenFn) {
     if (this.isAtCellCenter()) {
       const next = neighborCell(this.sprite.x, this.sprite.y, dir);
@@ -26,10 +22,10 @@ export default class Player {
         this.currentDirection = dir;
         this.queuedDirection = null;
         this.updateVelocity();
-        return; // applied instantly
+        return;
       }
     }
-    // Fallback: queue it for the next intersection
+    
     this.queuedDirection = dir;
   }
 

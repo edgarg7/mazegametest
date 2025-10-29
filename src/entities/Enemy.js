@@ -30,7 +30,6 @@ export default class Enemy {
       let options = openDirs(here.cx, here.cy, this.isOpen);
 
       if (options.length === 0) {
-        // Shouldn't happen in a carved maze, but just in case: stay put then bail
         this.sprite.setVelocity(0, 0);
         return;
       }
@@ -40,7 +39,7 @@ export default class Enemy {
       const viable = options.filter(d => d !== rev);
       if (viable.length) options = viable;
 
-      // Heuristic chase: choose neighbor that minimizes distance to player
+      
       const player = this.getPlayerCell();
       let best = options[0], bestScore = Infinity;
       for (const d of options) {
