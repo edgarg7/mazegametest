@@ -12,24 +12,26 @@ export default class InputManager {
       this.setupShootButton();
     } else {
       this.setupKeyboard();
-      this.setupMouseShoot();
+      this.setupDesktopPointerShoot();
     }
   }
 
-  /* ===== Desktop ===== */
+  /* ===================== DESKTOP ===================== */
   setupKeyboard() {
     const k = this.scene.input.keyboard;
     this.cursors = k.createCursorKeys();
-    const keys = k.addKeys('W,A,S,D');
+    const keys = k.addKeys('W,A,S,D,SPACE,CTRL');
+
     this.keys = {
       up:    [this.cursors.up,    keys.W],
       down:  [this.cursors.down,  keys.S],
       left:  [this.cursors.left,  keys.A],
       right: [this.cursors.right, keys.D],
     };
-    // Ctrl to shoot
-    const ctrl = k.addKey(Phaser.Input.Keyboard.KeyCodes.CONTROL);
-    ctrl.on('down', () => this.onShoot());
+
+    // Shoot with Space or Ctrl
+    keys.SPACE.on('down', () => this.onShoot());
+    keys.CTRL.on('down',  () => this.onShoot());
 
     // Prevent browser from stealing arrows/space
     this.scene.input.keyboard?.addCapture([
@@ -38,6 +40,7 @@ export default class InputManager {
       Phaser.Input.Keyboard.KeyCodes.UP,
       Phaser.Input.Keyboard.KeyCodes.DOWN,
       Phaser.Input.Keyboard.KeyCodes.SPACE,
+      Phaser.Input.Keyboard.KeyCodes.CONTROL,
     ]);
   }
 
@@ -51,61 +54,78 @@ export default class InputManager {
     return null;
   }
 
-  setupMouseShoot() {
+  // Left click anywhere = shoot (desktop only)
+  setupDesktopPointerShoot() {
     this.scene.input.on('pointerdown', (p) => {
-      // ignore if it's a touch pointer on hybrid devices
-      if (p.pointerType === 'mouse') this.onShoot();
+      // On some systems pointerType may be "", so just gate by !isTouch
+      if (!this.isTouch) this.onShoot();
     });
   }
 
-  /* ===== Mobile (swipe + on-screen shoot) ===== */
+  /* ===================== MOBILE ===================== */
   setupSwipe() {
-    let startX=0, startY=0, startT=0, activeId=null;
+    let startX=0, startY=0, startT=0, activeId=null, fired=false;
 
+    // When the user begins a swipe
     this.scene.input.on('pointerdown', (p) => {
-      // Only treat a single active finger as swipe intent
+      // only the first touch counts as a swipe
       if (activeId !== null) return;
-      startX = p.x; startY = p.y; startT = p.downTime; activeId = p.id;
+      activeId = p.id;
+      startX = p.x;
+      startY = p.y;
+      startT = p.downTime;
+      fired = false;
     });
 
-    this.scene.input.on('pointerup', (p) => {
-      if (p.id !== activeId) return;
-
+    // Track movement — trigger as soon as the threshold is passed (no need to wait for pointerup)
+    this.scene.input.on('pointermove', (p) => {
+      if (p.id !== activeId || fired) return;
       const dx = p.x - startX;
       const dy = p.y - startY;
-      const dt = p.upTime - startT;
+      const dt = p.moveTime - startT;
 
-      const dist = Math.hypot(dx, dy);
-      if (dist < SWIPE_MIN_DIST || dt > SWIPE_MAX_TIME) { activeId = null; return; }
+      if (dt > SWIPE_MAX_TIME) return;                // too slow → ignore
+      if (Math.hypot(dx, dy) < SWIPE_MIN_DIST) return;
 
       if (Math.abs(dx) > Math.abs(dy)) {
         this.onDirection(dx < 0 ? 'left' : 'right');
       } else {
         this.onDirection(dy < 0 ? 'up' : 'down');
       }
-      activeId = null;
+      fired = true;                                   // one direction per swipe
+    });
+
+    // Clean up the swipe state
+    this.scene.input.on('pointerup', (p) => {
+      if (p.id === activeId) { activeId = null; }
+    });
+    this.scene.input.on('pointerupoutside', (p) => {
+      if (p.id === activeId) { activeId = null; }
     });
   }
 
   setupShootButton() {
-    // Make a fixed-position shoot button (bottom-right)
+    // Fixed-position shoot button (bottom-right)
     const pad = 12;
+    const size = 76;
     const btn = this.scene.add.image(
-      this.scene.scale.width - 76 - pad,
-      this.scene.scale.height - 76 - pad,
+      this.scene.scale.width - size - pad,
+      this.scene.scale.height - size - pad,
       'shootBtn'
     ).setScrollFactor(0)
      .setDepth(10000)
      .setInteractive({ useHandCursor: true });
 
+    // Tap = shoot. Stop propagation so it doesn't register as a swipe.
     btn.on('pointerdown', (p) => {
       p.event?.stopPropagation();
       this.onShoot();
     });
 
-    // Keep it glued to the corner on rotation/resize
+    // Keep glued to corner on rotation/resize
     this.scene.scale.on('resize', (sz) => {
-      btn.setPosition(sz.width - 76 - pad, sz.height - 76 - pad);
+      btn.setPosition(sz.width - size - pad, sz.height - size - pad);
     });
   }
 }
+
