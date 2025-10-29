@@ -5,22 +5,24 @@ import Enemy from '../entities/Enemy.js';
 import BulletPool from '../entities/BulletPool.js';
 import InputManager from '../systems/InputManager.js';
 
-const START_ENEMIES = 3;                 // spawn near exit at level start
-const ENEMY_SPAWN_INTERVAL = 20000;      // spawn one new enemy every 20s
-const NEAR_EXIT_RADIUS = 6;              // cells around exit to use for initial spawns
-const RANDOM_MIN_DIST_FROM_PLAYER = 10;  // cells; fairness for random spawns
-const MAX_SPAWN_ATTEMPTS = 40;           // safety loop cap
+const START_ENEMIES = 3;
+const ENEMY_SPAWN_INTERVAL = 20000;
+const NEAR_EXIT_RADIUS = 6;
+const RANDOM_MIN_DIST_FROM_PLAYER = 10;
+const MAX_SPAWN_ATTEMPTS = 40;
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super('Game'); }
 
   init(data) {
-    this.isTouch = !!data?.isTouch;
+    // Auto-detect touch if not explicitly passed
+    const touchCapable = this.sys.game.device?.input?.touch;
+    this.isTouch = data?.isTouch ?? !!touchCapable;
+
     this.level = 1;
     this.started = true;
     this.timerStart = 0;
     this.elapsed = 0;
-
     this.spawnTimer = null;
   }
 
@@ -30,14 +32,15 @@ export default class GameScene extends Phaser.Scene {
 
     this.buildLevel(this.level);
 
-    // HUD
-    this.hudBg = this.add.rectangle(8, 8, 280, 36, 0x000000, 0.42)
+    // HUD (slightly lower on mobile to avoid status bar)
+    const hudY = this.isTouch ? 22 : 12;
+    this.hudBg = this.add.rectangle(8, hudY - 4, 280, 36, 0x000000, 0.42)
       .setOrigin(0, 0).setScrollFactor(0).setDepth(10001);
-    this.hud = this.add.text(16, 12, '', {
+    this.hud = this.add.text(16, hudY, '', {
       fontSize: 20, color: '#FFFFFF', fontFamily: 'sans-serif'
     }).setScrollFactor(0).setDepth(10002);
 
-    // Inputs
+    // Inputs (mobile: swipe; desktop: keys)
     this.inputMgr = new InputManager(this, {
       isTouchDevice: this.isTouch,
       onDirection: (dir) => { this.player.requestDirection?.(dir, (cx, cy) => this.isOpen(cx, cy)); },
@@ -46,12 +49,12 @@ export default class GameScene extends Phaser.Scene {
 
     this.timerStart = this.time.now;
 
-    // Resize handling
+    // Resize handling (also called once immediately)
     this.scale.on('resize', this.handleResize, this);
     this.handleResize({ width: this.scale.width, height: this.scale.height });
   }
 
-  /* ===== Build maze sized to fill the viewport (no gutters) ===== */
+  /* ===== Build maze sized to fill the viewport ===== */
   buildLevel(level) {
     // Cleanup
     if (this.spawnTimer) { this.spawnTimer.remove(false); this.spawnTimer = null; }
@@ -62,10 +65,8 @@ export default class GameScene extends Phaser.Scene {
     if (this.exitMarker) { this.exitMarker.destroy(); this.exitMarker = null; }
     if (this.exitZone) { this.exitZone.destroy(); this.exitZone = null; }
 
-    // Derive cols/rows from the current viewport so world >= viewport
     const vw = this.scale.width;
     const vh = this.scale.height;
-
     const colsFit = makeOdd(Math.max(7, Math.ceil(vw / CELL_SIZE)));
     const rowsFit = makeOdd(Math.max(7, Math.ceil(vh / CELL_SIZE)));
 
@@ -75,7 +76,7 @@ export default class GameScene extends Phaser.Scene {
     });
     this.grid = grid; this.cols = cols; this.rows = rows; this.exitCell = exitCell;
 
-    // Walls (static)
+    // Walls
     this.wallBodies = this.physics.add.staticGroup();
     for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
       if (grid[y][x] === 0) {
@@ -95,14 +96,10 @@ export default class GameScene extends Phaser.Scene {
     this.player = new Player(this, startX, startY);
     this.physics.add.collider(this.player.sprite, this.wallBodies);
 
-    // Enemies container
+    // Enemies
     this.enemiesGroup = this.physics.add.group();
     this.enemies = [];
-
-    // 🔰 Initial enemies: spawn near the exit (not at player)
-    for (let i = 0; i < START_ENEMIES; i++) {
-      this.spawnEnemyNearExit();
-    }
+    for (let i = 0; i < START_ENEMIES; i++) this.spawnEnemyNearExit();
 
     // Bullets
     this.bullets = new BulletPool(this);
@@ -114,11 +111,10 @@ export default class GameScene extends Phaser.Scene {
       if (idx >= 0) this.enemies.splice(idx, 1);
       enemySprite.disableBody(true, true);
       enemySprite.destroy();
-      this.bullets.group.killAndHide(bullet);
-      bullet.body.stop();
+      this.bullets.group.killAndHide(bullet); bullet.body.stop();
     });
 
-    // Exit marker + zone
+    // Exit
     this.exitMarker = this.add.rectangle(
       exitCell.x * CELL_SIZE + CELL_SIZE/2,
       exitCell.y * CELL_SIZE + CELL_SIZE/2,
@@ -131,11 +127,11 @@ export default class GameScene extends Phaser.Scene {
     this.exitZone.body.moves = false;
     this.physics.add.overlap(this.player.sprite, this.exitZone, () => this.winLevel(), null, this);
 
-    // Camera follow & fit
+    // Camera
     this.cameras.main.startFollow(this.player.sprite, true, 0.12, 0.12);
     this.handleResize({ width: this.scale.width, height: this.scale.height });
 
-    // 🔁 Periodic random spawns (every 20s), away from the player
+    // Periodic random spawns
     this.spawnTimer = this.time.addEvent({
       delay: ENEMY_SPAWN_INTERVAL,
       loop: true,
@@ -143,7 +139,7 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Spawn near the exit within NEAR_EXIT_RADIUS cells, avoiding the player cell. */
+  /* ===== Enemy spawns ===== */
   spawnEnemyNearExit() {
     const exit = this.exitCell;
     const playerCell = this.getPlayerCell();
@@ -152,22 +148,18 @@ export default class GameScene extends Phaser.Scene {
     for (let y = Math.max(1, exit.y - NEAR_EXIT_RADIUS); y <= Math.min(this.rows - 2, exit.y + NEAR_EXIT_RADIUS); y++) {
       for (let x = Math.max(1, exit.x - NEAR_EXIT_RADIUS); x <= Math.min(this.cols - 2, exit.x + NEAR_EXIT_RADIUS); x++) {
         if (!this.isOpen(x, y)) continue;
-        // keep within a disk-ish area
-        const d = Math.abs(x - exit.x) + Math.abs(y - exit.y);
-        if (d === 0 || d > NEAR_EXIT_RADIUS) continue;
-        // avoid player start area
-        if (Math.abs(x - playerCell.cx) + Math.abs(y - playerCell.cy) < RANDOM_MIN_DIST_FROM_PLAYER) continue;
+        const dExit = Math.abs(x - exit.x) + Math.abs(y - exit.y);
+        if (dExit === 0 || dExit > NEAR_EXIT_RADIUS) continue;
+        const dPlayer = Math.abs(x - playerCell.cx) + Math.abs(y - playerCell.cy);
+        if (dPlayer < RANDOM_MIN_DIST_FROM_PLAYER) continue;
         candidates.push({ x, y });
       }
     }
-    // Fallback to far-open cell if not enough candidates
     let chosen = candidates.length ? candidates[(Math.random() * candidates.length) | 0]
                                    : this.findFarOpenCell(playerCell, RANDOM_MIN_DIST_FROM_PLAYER);
-
     this._spawnEnemyAt(chosen.x, chosen.y);
   }
 
-  /** Spawn at a random open cell far enough from the player. */
   spawnEnemyRandom() {
     const playerCell = this.getPlayerCell();
     let pick = null;
@@ -182,7 +174,6 @@ export default class GameScene extends Phaser.Scene {
     this._spawnEnemyAt(pick.x, pick.y);
   }
 
-  /** Internal helper: instantiate + register one enemy at grid coords. */
   _spawnEnemyAt(cx, cy) {
     const ex = cx * CELL_SIZE + CELL_SIZE / 2;
     const ey = cy * CELL_SIZE + CELL_SIZE / 2;
@@ -193,7 +184,7 @@ export default class GameScene extends Phaser.Scene {
     this.physics.add.overlap(enemy.sprite, this.player.sprite, () => this.onHitByEnemy());
   }
 
-  /* ===== Keep view perfectly filled ===== */
+  /* ===== Resize / camera fit ===== */
   handleResize(size) {
     const w = size.width ?? this.scale.width;
     const h = size.height ?? this.scale.height;
@@ -208,21 +199,23 @@ export default class GameScene extends Phaser.Scene {
     const z = Math.min(zx, zy);
     this.cameras.main.setZoom(Phaser.Math.Clamp(z, 0.1, 4));
 
-    this.hudBg?.setPosition(8, 8);
-    this.hud?.setPosition(16, 12);
+    // Keep HUD pinned (slightly lower on mobile)
+    const hudY = this.isTouch ? 22 : 12;
+    this.hudBg?.setPosition(8, hudY - 4);
+    this.hud?.setPosition(16, hudY);
   }
 
   /* ===== Loop ===== */
   update(time, delta) {
-    // Desktop: per-frame keys
     if (!this.isTouch) {
+      // Desktop: keys each frame
       const dir = this.inputMgr.getKeyDirection?.();
       const S = PLAYER_SPEED;
       const vx = dir === 'left' ? -S : dir === 'right' ? S : 0;
       const vy = dir === 'up' ? -S : dir === 'down' ? S : 0;
       this.player.sprite.setVelocity(vx, vy);
     } else {
-      // Mobile: queued turns
+      // Mobile: apply queued turns from swipes
       this.player.tryApplyQueuedTurn?.((cx,cy)=>this.isOpen(cx,cy));
       this.player.nudgeIntoCorridor?.((cx,cy)=>this.isOpen(cx,cy));
     }
@@ -233,7 +226,7 @@ export default class GameScene extends Phaser.Scene {
       if (e?.sprite?.active) e.update();
     }
 
-    // HUD text
+    // HUD
     this.elapsed = time - this.timerStart;
     this.hud.setText(`Level ${this.level}/${MAX_LEVELS}   Time ${formatMs(this.elapsed)}`);
     this.hudBg.width = this.hud.width + 24;
@@ -250,12 +243,11 @@ export default class GameScene extends Phaser.Scene {
 
   onHitByEnemy() {
     this.cameras.main.shake(120, 0.006);
-    this.scene.restart({ isTouch: this.isTouch });
+    this.scene.restart({ isTouch: this.isTouch }); // preserve touch mode
   }
 
   winLevel() {
     if (this.spawnTimer) { this.spawnTimer.remove(false); this.spawnTimer = null; }
-
     if (this.level < MAX_LEVELS) {
       this.level++;
       this.buildLevel(this.level);
@@ -306,5 +298,4 @@ function formatMs(ms) {
   const hundredths = String(Math.floor((ms%1000)/10)).padStart(2,'0');
   return `${mm}:${ss}.${hundredths}`;
 }
-
 function makeOdd(n){ return n % 2 === 0 ? n + 1 : n; }
