@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Tower of Trials</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0a84ff" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #040218;
+      touch-action: none;          /* prevent page scrolling on touch */
+      overflow: hidden;            /* no scrollbars */
+    }
+    #game {
+      width: 100vw;                /* canvas fills window */
+      height: 100vh;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="game"></div>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.0/dist/phaser.min.js"></script>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
