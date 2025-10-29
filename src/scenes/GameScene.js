@@ -5,11 +5,11 @@ import Enemy from '../entities/Enemy.js';
 import BulletPool from '../entities/BulletPool.js';
 import InputManager from '../systems/InputManager.js';
 
-const START_ENEMIES = 3;
-const ENEMY_SPAWN_INTERVAL = 20000;
-const NEAR_EXIT_RADIUS = 6;
-const RANDOM_MIN_DIST_FROM_PLAYER = 10;
-const MAX_SPAWN_ATTEMPTS = 40;
+const START_ENEMIES = 3;                 // spawn near exit at level start
+const ENEMY_SPAWN_INTERVAL = 20000;      // new enemy every 20s
+const NEAR_EXIT_RADIUS = 6;              // cells around exit for initial spawns
+const RANDOM_MIN_DIST_FROM_PLAYER = 10;  // fairness for random spawns
+const MAX_SPAWN_ATTEMPTS = 40;           // safety loop cap
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super('Game'); }
@@ -40,7 +40,7 @@ export default class GameScene extends Phaser.Scene {
       fontSize: 20, color: '#FFFFFF', fontFamily: 'sans-serif'
     }).setScrollFactor(0).setDepth(10002);
 
-    // Inputs (mobile: swipe; desktop: keys)
+    // Inputs (mobile: joystick; desktop: keys + mouse)
     this.inputMgr = new InputManager(this, {
       isTouchDevice: this.isTouch,
       onDirection: (dir) => { this.player.requestDirection?.(dir, (cx, cy) => this.isOpen(cx, cy)); },
@@ -49,7 +49,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.timerStart = this.time.now;
 
-    // Resize handling (also called once immediately)
+    // Resize handling
     this.scale.on('resize', this.handleResize, this);
     this.handleResize({ width: this.scale.width, height: this.scale.height });
   }
@@ -96,9 +96,11 @@ export default class GameScene extends Phaser.Scene {
     this.player = new Player(this, startX, startY);
     this.physics.add.collider(this.player.sprite, this.wallBodies);
 
-    // Enemies
+    // Enemies container
     this.enemiesGroup = this.physics.add.group();
     this.enemies = [];
+
+    // Initial enemies near the exit
     for (let i = 0; i < START_ENEMIES; i++) this.spawnEnemyNearExit();
 
     // Bullets
@@ -215,9 +217,14 @@ export default class GameScene extends Phaser.Scene {
       const vy = dir === 'up' ? -S : dir === 'down' ? S : 0;
       this.player.sprite.setVelocity(vx, vy);
     } else {
-      // Mobile: apply queued turns from swipes
-      this.player.tryApplyQueuedTurn?.((cx,cy)=>this.isOpen(cx,cy));
-      this.player.nudgeIntoCorridor?.((cx,cy)=>this.isOpen(cx,cy));
+      // Mobile: joystick vector → continuous velocity
+      const v = this.inputMgr.getJoystickVector();
+      const S = PLAYER_SPEED;
+      this.player.sprite.setVelocity(v.x * S, v.y * S);
+
+      // To force strict 4-way movement instead of diagonals, replace above with:
+      // if (Math.abs(v.x) > Math.abs(v.y)) this.player.sprite.setVelocity(Math.sign(v.x)*S, 0);
+      // else this.player.sprite.setVelocity(0, Math.sign(v.y)*S);
     }
 
     // Enemies
