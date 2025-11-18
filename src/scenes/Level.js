@@ -885,7 +885,7 @@ export default class Level extends Phaser.Scene {
 
 	//--- Update Joystick State ---
 	updateJoystick(pointer) {
-		if (!this.joystickBase || !this,this.joystickThumb) return;
+		if (!this.joystickBase || !this.this.joystickThumb) return;
 
 		const baseX = this.joystickBase.x;
 		const baseY = this.joystickBase.y;
