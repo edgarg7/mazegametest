@@ -475,32 +475,46 @@ export default class Level extends Phaser.Scene {
 		player.body.setCollideWorldBounds(true);	//keep player inside the screen
 		player.body.setBounce(0.1, 0.1);
 
-		//--- Enemy Group + Patrol ---
-		this.enemies = this.physics.add.group();
-		if (this.enemy1) this.enemies.add(this.enemy1);
-		if (this.enemy2) this.enemies.add(this.enemy2);
-		if (this.enemy3) this.enemies.add(this.enemy3);
-
+		//--- Enemy + Patrol ---
 		const PATROL_SPEED = 70; 	//enemy speed
-		const PATROL_RANGE = 96;	//distance enemy covers
+		const PATROL_RANGE = 100;	//how far enemy moves from starting point
 
-		this.enemies.children.iterate(enemy => {
-			if (!enemy || !enemy.body) return;
+		const enemySpawnData = [];
 
+		if (this.enemy1) enemySpawnData.push({ x: this.enemy1.x, y: this.enemy1.y });
+		if (this.enemy2) enemySpawnData.push({ x: this.enemy2.x, y: this.enemy2.y });
+		if (this.enemy3) enemySpawnData.push({ x: this.enemy3.x, y: this.enemy3.y });
+
+		if (this.enemy1) this.enemy1.destroy();
+		if (this.enemy2) this.enemy2.destroy();
+		if (this.enemy3) this.enemy3.destroy();
+
+		this.enemies = this.physics.add.group();
+
+		enemySpawnData.forEach(pos => {
+			const enemy = this.physics.add.sprite(pos.x, pos.y, "enemywalkingright1");
+
+			enemy.body.setSize(40, 40, true);
 			enemy.body.setCollideWorldBounds(true);
-			enemy.body.setBounce(0, 0);
+			enemy.setBounce(0, 0);
 
-			//starting point where enemies will patrol
-			enemy.startX = enemy.x;
+			//patrol data
+			enemy.startX = pos.x;
 			enemy.minX = enemy.startX - PATROL_RANGE;
 			enemy.maxX = enemy.startX + PATROL_RANGE;
-
 			enemy.patrolDir = 1;
 			enemy.patrolSpeed = PATROL_SPEED;
 
-			//start moving to the right
+			//start movement
 			enemy.body.setVelocityX(enemy.patrolSpeed * enemy.patrolDir);
+			enemy.setFlipX(false);
+			enemy.play("enemy_walk");
+
+			this.enemies.add(enemy);
 		});
+
+		//enemies collide with ground
+		this.physics.add.collider(this.enemies, this.ground);
 
 		// --- Bullet Group ---
 		this.bullets = this.physics.add.group({
@@ -608,6 +622,19 @@ export default class Level extends Phaser.Scene {
 		});
 
 		player.play("player_idle_front");
+
+		//--- Enemy walking animation ---
+		this.anims.create({
+			key: "enemy_walk",
+			frames: [
+				{ key: "enemywalkingright1" },
+				{ key: "enemywalkingright2" },
+				{ key: "enemywalkingright3" },
+				{ key: "enemywalkingright4" }
+			],
+			frameRate: 8,
+			repeat: -1
+		});
 	}
 
 	update(){
@@ -667,8 +694,10 @@ export default class Level extends Phaser.Scene {
 
 				if (enemy.x <= enemy.minX) {
 					enemy.patrolDir = 1;
+					if (enemy.setFlipX) enemy.setFlipX(false);
 				} else if (enemy.x >= enemy.maxX) {
 					enemy.patrolDir = -1;
+					if (enemy.setFlipX) enemy.setFlipX(true);
 				}
 
 				enemy.body.setVelocityX(enemy.patrolSpeed * enemy.patrolDir);

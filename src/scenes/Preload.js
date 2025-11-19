@@ -71,6 +71,11 @@ export default class Preload extends Phaser.Scene {
 
 			this.progressBar.width = progress * width;
 		});
+
+		this.load.image("enemywalkingright1", "assets/enemywalkingright1.png");
+		this.load.image("enemywalkingright2", "assets/enemywalkingright2.png");
+		this.load.image("enemywalkingright3", "assets/enemywalkingright3.png");
+		this.load.image("enemywalkingright4", "assets/enemywalkingright4.png");
 	}
 
 	create() {
