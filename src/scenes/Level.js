@@ -820,12 +820,13 @@ export default class Level extends Phaser.Scene {
 		//--- Joystick ---
 		const baseX = 80;
 		const baseY = height - 80;
-		const baseRadius = 40;
+		const baseRadius = 70;
 
 		//--- Joystick Base ---
 		const base = this.add.circle(baseX, baseY, baseRadius, 0x000000, 0.3);
 		base.setScrollFactor(0);
 		base.setDepth(1000);
+		base.setInteractive();
 
 		//--- Joystick Thumb ---
 		const thumb = this.add.circle(baseX, baseY, baseRadius * 0.5, 0xffffff, 0.6);
@@ -883,7 +884,7 @@ export default class Level extends Phaser.Scene {
 
 	//--- Update Joystick State ---
 	updateJoystick(pointer) {
-		if (!this.joystickBase || !this.this.joystickThumb) return;
+		if (!this.joystickBase || !this.joystickThumb) return;
 
 		const baseX = this.joystickBase.x;
 		const baseY = this.joystickBase.y;
