@@ -505,7 +505,7 @@ export default class Level extends Phaser.Scene {
 		// --- Bullet Group ---
 		this.bullets = this.physics.add.group({
 			defaultKey: "bulletTex",	//use texture we created
-			maxSize: 50,				//max bullets at once
+			maxSize: 100,				//max bullets at once
 			allowGravity: false
 		});
 
@@ -832,8 +832,6 @@ export default class Level extends Phaser.Scene {
 		thumb.setScrollFactor(0);
 		thumb.setDepth(1001);
 
-		base.setInteractive();
-
 		this.joystickBase = base;
 		this.joystickThumb = thumb;
 		this.joystickPointerId = null;
@@ -842,11 +840,17 @@ export default class Level extends Phaser.Scene {
 		this.joystickUp = false;
 
 		//--- Pointer Events on Joystick ---
-		base.on("pointerdown", (pointer) => {
-			if (this.joystickPointerId === null) {
-				this.joystickPointerId = pointer.id;
-				this.updateJoystick(pointer);
+		this.input.on("pointerdown", (pointer) => {
+			if (this.joystickPointerId !== null) {
+				return;
 			}
+
+			if (pointer.x > width / 2) {
+				return
+			}
+
+			this.joystickPointerId = pointer.id;
+			this.updateJoystick(pointer);
 		});
 
 		this.input.on("pointermove", (pointer) => {
@@ -856,12 +860,6 @@ export default class Level extends Phaser.Scene {
 		});
 
 		this.input.on("pointerup", (pointer) => {
-			if (pointer.id === this.joystickPointerId) {
-				this.resetJoystick();
-			}
-		});
-
-		this.input.on("pointerupoutside", (pointer) => {
 			if (pointer.id === this.joystickPointerId) {
 				this.resetJoystick();
 			}
