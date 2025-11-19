@@ -694,10 +694,10 @@ export default class Level extends Phaser.Scene {
 
 				if (enemy.x <= enemy.minX) {
 					enemy.patrolDir = 1;
-					if (enemy.setFlipX) enemy.setFlipX(false);
+					enemy.setFlipX(false);
 				} else if (enemy.x >= enemy.maxX) {
 					enemy.patrolDir = -1;
-					if (enemy.setFlipX) enemy.setFlipX(true);
+					enemy.setFlipX(true);
 				}
 
 				enemy.body.setVelocityX(enemy.patrolSpeed * enemy.patrolDir);
