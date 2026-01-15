@@ -333,6 +333,27 @@ export default class LevelOne extends Phaser.Scene {
 	door;
 	/** @type {Phaser.Physics.Arcade.Image[]} */
 	ground;
+	/** @type {Phaser.GameObjects.Circle}  */
+	joystickBase;
+	/** @type {Phaser.GameObjects.Circle}  */
+	joystickThumb;
+	/** @type {Phaser.GameObjects.GameObject} */
+	shootButton;
+
+	/** @type {number|null} */
+	joystickPointerId;
+	/** @type {boolean} */
+	joystickLeft = false;
+	/** @type {boolean} */
+	joystickRight = false;
+	/** @type {boolean} */
+	joystickUp = false;
+
+	/** @type {boolean} */
+	isMobile = false;
+
+	//** @type {Phaser.Sound.BaseSound} */
+	bgMusic;
 
 	/* START-USER-CODE */
 
@@ -343,6 +364,13 @@ export default class LevelOne extends Phaser.Scene {
 		this.editorCreate();
 
 		const player = this.player;
+
+		// --- Background Music ---
+		this.bgMusic = this.sound.add("bgMusic", {
+			loop: true,
+			volume: 0.5
+		});
+		this.bgMusic.play();
 
 		//-- Game State --
 		this.gameOver = false;
@@ -359,7 +387,12 @@ export default class LevelOne extends Phaser.Scene {
 			});
 		}
 
-		//-- Physics for the key and door ---
+		//--- key and door setup ---
+		/**
+		 * Configures the key and door physics.
+		 * The key is immovable and does not fall due to gravity.
+		 * The door is a static object that the player can interact with.
+		 */
 		const key = this.key;
 		const door = this.door;
 
@@ -391,6 +424,10 @@ export default class LevelOne extends Phaser.Scene {
 		}
 
 		//--- Bullet Group ---
+		/**
+		 * Creates a group for bullets with a maximum size and no gravity.
+		 * Bullets are used for shooting mechanics in the game.
+		 */
 		this.bullets = this.physics.add.group({
 			defaultKey: "bulletTex",
 			maxSize: 50,
@@ -433,6 +470,9 @@ export default class LevelOne extends Phaser.Scene {
 		);
 
 		//--- Input for player movement ---
+		/**
+		 * Creates keyboard input for player movement and shooting.
+		 */
 		this.cursor = this.input.keyboard.createCursorKeys();
 		this.wasd = this.input.keyboard.addKeys({
 			up: Phaser.Input.Keyboard.KeyCodes.W,
@@ -441,9 +481,20 @@ export default class LevelOne extends Phaser.Scene {
 			right: Phaser.Input.Keyboard.KeyCodes.D
 		});
 
+		//--- Spacebar for shooting ---
 		this.shootKey = this.input.keyboard.addKey(
 			Phaser.Input.Keyboard.KeyCodes.SPACE
 		);
+
+		//--- Mobile Detection & Controls ---
+		/**
+		 * Detects if the game is running on a mobile device.
+		 */
+		this.isMobile = !this.sys.game.device.os.desktop;
+
+		if (this.isMobile) {
+			this.createMobileControls();
+		}
 
 		//--- Player Animations ---
 		this.anims.create({
@@ -483,17 +534,37 @@ export default class LevelOne extends Phaser.Scene {
 		const speed = 200;
 		const jumpSpeed = -450
 
-		//--- This will combine the use of arrow keys + WASD
-		const leftPressed = this.cursor.left.isDown || this.wasd.left.isDown;
-		const rightPressed = this.cursor.right.isDown || this.wasd.right.isDown;
-		const upPressed = this.cursor.up.isDown || this.wasd.up.isDown;
+		//--- Combine Arrows + WASD + Joystick ---
+		/**
+		 * Combines input from keyboard arrows, WASD keys, and joystick for player movement.
+		 */
+		const leftPressed =
+			this.cursor.left.isDown ||
+			this.wasd.left.isDown ||
+			!!this.joystickLeft;
+		
+		const rightPressed =
+			this.cursor.right.isDown ||
+			this.wasd.right.isDown ||
+			!!this.joystickRight;
+
+		const upPressed =
+			this.cursor.up.isDown ||
+			this.wasd.up.isDown ||
+			!!this.joystickUp;
 
 		//--- Shoot ---
+		/**
+		 * Checks if the shoot key is pressed and calls the shootBullet method.
+		 */
 		if (Phaser.Input.Keyboard.JustDown(this.shootKey)) {
 			this.shootBullet();
 		}
 
 		//--- Animation + Horizontal movement ---
+		/**
+		 * Handles player movement and animation based on input.
+		 */
 		if (leftPressed) {
 			player.body.setVelocityX(-speed);
 			player.setFlipX(true);
@@ -507,49 +578,74 @@ export default class LevelOne extends Phaser.Scene {
 			player.play("player_idle_front", true);
 		}
 
-		//--- Jump ---
+		//--- Jump Logic ---
+		/**
+		 * Handles player jumping when the up key is pressed and the player is on the ground.
+		 */
 		if (upPressed && player.body.blocked.down) {
 			player.body.setVelocityY(jumpSpeed);
 		}
 	}
 
 	//--- Shooting Logic ---
+	/**
+	 * Shoots a bullet from the player's position in the direction they are facing.
+	 * The bullet is spawned slightly in front of the player and travels across the screen.
+	 */
 	shootBullet() {
 		const player = this.player;
 		const BULLET_SPEED = 400;
 
 		const dir = player.flipX ? -1 : 1;
+
+		//spawn slightly in front of the player
 		const offsetX = 20 * dir;
+
+		//Put bullet around mid-body
 		const bulletY = player.y - player.displayHeight * 0.5;
 
+		//Get a bullet from the physics group
 		const bullet = this.bullets.get(player.x + offsetX, bulletY);
 		if (!bullet) return;
 
+		//activate and show it
 		bullet.setActive(true);
 		bullet.setVisible(true);
 
+		//Ensure its body is enabled and dynamic
 		bullet.body.enable = true;
 		bullet.body.allowGravity = false;
+
+		//Set velocity so bullet travels across the screen
 		bullet.body.setVelocityX(BULLET_SPEED * dir);
 	}
 
 	//--- Bullets hit ground logic ----
 	onBulletHitPlatform(platform, bullet) {
+		//destroys bullet when it hits platform, platform stays
 		if (bullet && bullet.destroy) {
 			bullet.destroy();
 		}
 	}
 
 	//--- Player Picks Up Key Logic ----
+	/**
+	 * Handles the event when the player picks up a key.
+	 * If the player does not already have the key, it marks the key as collected,
+	 * removes it from the level, and displays a "Key + 1" message on screen.
+	 */
 	onPlayerPickupKey(player, key) {
 		if (this.hasKey) return;
 
+		//mark that we have the key
 		this.hasKey = true;
 
+		// Remove the key from the level
 		if (key && key.destroy) {
 			key.destroy();
 		}
 
+		//Show "Key + 1" on screen
 		const { width, height } = this.scale;
 
 		const text = this.add.text(
@@ -564,6 +660,7 @@ export default class LevelOne extends Phaser.Scene {
 		.setOrigin(0.5)
 		.setDepth(999);
 
+		//Remove the text after 1 second
 		this.time.delayedCall(1000, () => {
 			if (text && text.destroy) {
 				text.destroy();
@@ -572,13 +669,23 @@ export default class LevelOne extends Phaser.Scene {
 	}
 
 	//--- Player reaches door logic ---
+	/**
+	 * Handles the event when the player reaches the door.
+	 * If the player has the key, it marks the level as complete,
+	 * stops the background music, pauses the game physics,
+	 * and displays a "LEVEL COMPLETE" message.
+	 */
 	onPlayerReachDoor(player, door) {
-		//this is only triggered if the player has the key and the level is not already done.
 		if (!this.hasKey || this.levelComplete || this.gameOver) {
 			return;
 		}
 
 		this.levelComplete = true;
+
+		// Stop background music
+		if (this.bgMusic && this.bgMusic.isPlaying) {
+			this.bgMusic.stop();
+		}
 
 		//freezes gameplay
 		this.physics.pause();
@@ -597,6 +704,170 @@ export default class LevelOne extends Phaser.Scene {
 		this.time.delayedCall(1500, () => {
 			this.scene.start("Level");
 		});
+	}
+
+	//--- Mobile Controls: Joystick + Shoot Button ---
+	/**
+	 * Creates on-screen joystick and shoot button for mobile devices.
+	 * The joystick allows for player movement, while the shoot button enables shooting bullets.
+	 */
+	createMobileControls() {
+		const width = this.scale.width;
+		const height = this.scale.height;
+
+		//--- Joystick ---
+		const baseX = 80;
+		const baseY = height - 80;
+		const baseRadius = 70;
+
+		//--- Joystick Base ---
+		const base = this.add.circle(baseX, baseY, baseRadius, 0x000000, 0.3);
+		base.setScrollFactor(0);
+		base.setDepth(1000);
+		base.setInteractive();
+
+		//--- Joystick Thumb ---
+		const thumb = this.add.circle(baseX, baseY, baseRadius * 0.5, 0xffffff, 0.6);
+		thumb.setScrollFactor(0);
+		thumb.setDepth(1001);
+
+		this.joystickBase = base;
+		this.joystickThumb = thumb;
+		this.joystickPointerId = null;
+		this.joystickLeft = false;
+		this.joystickRight = false;
+		this.joystickUp = false;
+
+		//--- Pointer Events on Joystick ---
+		
+		/**
+		 * If the joystick area is touched, starts tracking that pointer for joystick movement.
+		 */
+		this.input.on("pointerdown", (pointer) => {		
+			if (this.joystickPointerId !== null) {
+				return;
+			}
+
+			if (pointer.x > width / 2) {
+				return
+			}
+
+			this.joystickPointerId = pointer.id;
+			this.updateJoystick(pointer);
+		});
+
+		/**
+		 * If the joystick touch moves, updates the joystick state.
+		 */
+		this.input.on("pointermove", (pointer) => {
+			if (pointer.id === this.joystickPointerId) {
+				this.updateJoystick(pointer);
+			}
+		});
+
+		/**
+		 * if the joystick touch is released, resets the joystick state.
+		 */
+		this.input.on("pointerup", (pointer) => {
+			if (pointer.id === this.joystickPointerId) {
+				this.resetJoystick();
+			}
+		});
+
+		//--- Shoot Button ---
+		/**
+		 * Creates a shoot button on the screen for mobile devices.
+		 */
+		const shootRadius = 30;
+		const shoot = this.add.circle(width - 80, height - 80, shootRadius, 0xff4444, 0.7);
+		shoot.setScrollFactor(0);
+		shoot.setDepth(1000);
+		shoot.setInteractive();
+
+		/**
+		 * If the shoot button is pressed, calls the shootBullet method.
+		 */
+		shoot.on("pointerdown", () => {
+			if (!this.gameOver && !this.levelComplete) {
+				this.shootBullet();
+			}
+		});
+
+		this.shootButton = shoot;
+	}
+
+	//--- Update Joystick State ---
+	updateJoystick(pointer) {
+
+		/**
+		 * if there is no joystick, return.
+		 */
+		if (!this.joystickBase || !this.joystickThumb) return;
+
+		/**
+		 * Calculates the joystick thumb position based on pointer location,
+		 * clamping it within a maximum distance from the joystick base.
+		 */
+		const baseX = this.joystickBase.x;
+		const baseY = this.joystickBase.y;
+		const maxDist = 40;
+
+		const dx = pointer.x - baseX;
+		const dy = pointer.y - baseY;
+
+		/**
+		 * Calculates the distance from the joystick base to the pointer.
+		 * If the distance exceeds the maximum allowed, it clamps the thumb position.
+		 */
+		let dist = Math.sqrt(dx * dx + dy * dy);
+		let clampedDx = dx;
+		let clampedDy = dy;
+
+		/**
+		 * Clamps the joystick thumb position within the maximum distance.
+		 */
+		if (dist > maxDist) {
+			const ratio = maxDist / dist;
+			clampedDx *= ratio;
+			clampedDy *= ratio;
+		}
+
+		/**
+		 * Sets the joystick thumb position based on the clamped values.
+		 */
+		this.joystickThumb.setPosition(baseX + clampedDx, baseY + clampedDy);
+
+		/**
+		 * Determines the joystick direction based on the clamped thumb position.
+		 */
+		this.joystickLeft = clampedDx < -10;
+		this.joystickRight = clampedDx > 10;
+		this.joystickUp = clampedDy < -15;
+	}
+
+	//--- Reset Joystick ---
+	/**
+	 * Resets the joystick to its neutral position and clears directional flags.
+	 */
+	resetJoystick() {
+
+		/**
+		 * if there is no joystick, return.
+		 */
+		if (!this.joystickBase || !this.joystickThumb) return;
+
+		/**
+		 * Resets the joystick pointer ID and thumb position.
+		 */
+		this.joystickPointerId = null;
+		this.joystickThumb.setPosition(this.joystickBase.x, this.joystickBase.y);
+
+		/**
+		 * Clears the joystick directional flags.
+		 */
+		this.joystickLeft = false;
+		this.joystickRight = false;
+		this.joystickUp = false;
 	}
 
 	/* END-USER-CODE */

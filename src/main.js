@@ -4,6 +4,9 @@ import Level from "./scenes/Level.js";
 
 window.addEventListener('load', function () {
 
+	/**
+	 * Initializes the Phaser game with specified configurations.
+	 */
 	var game = new Phaser.Game({
 		width: 1280,
 		height: 720,
@@ -24,6 +27,9 @@ window.addEventListener('load', function () {
 		}
 	});
 
+	/**
+	 * Adds game scenes to the Phaser game instance.
+	 */
 	game.scene.add("Preload", Preload);
 	game.scene.add("LevelOne", LevelOne);
 	game.scene.add("Level", Level);
@@ -34,11 +40,17 @@ class Boot extends Phaser.Scene {
 
 	preload() {
 		
+		/**
+		 * Loads the asset pack for preloading assets.
+		 */
 		this.load.pack("pack", "assets/preload-asset-pack.json");
 	}
 
 	create() {
 
+		/**
+		 * Starts the Preload scene after booting.
+		 */
 		this.scene.start("Preload");
 	}
 }
